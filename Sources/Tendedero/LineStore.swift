@@ -34,6 +34,16 @@ enum StoredEntry: Codable, Equatable {
     }
 }
 
+/// An entry that cannot be read is skipped instead of failing the whole line:
+/// notes have no file behind them, so losing them is final.
+private struct Lossy: Decodable {
+    let entry: StoredEntry?
+
+    init(from decoder: Decoder) throws {
+        entry = try? StoredEntry(from: decoder)
+    }
+}
+
 /// The saved line, in rope order. Before notes existed only the paths of the
 /// photos were saved, under `legacyKey`: they are read when nothing has been
 /// saved under the new key yet.
@@ -45,7 +55,7 @@ struct LineStore {
 
     func load() -> [StoredEntry] {
         if let data = defaults.data(forKey: Self.key) {
-            return (try? JSONDecoder().decode([StoredEntry].self, from: data)) ?? []
+            return ((try? JSONDecoder().decode([Lossy].self, from: data)) ?? []).compactMap(\.entry)
         }
         return (defaults.stringArray(forKey: Self.legacyKey) ?? []).map { .photo(path: $0) }
     }

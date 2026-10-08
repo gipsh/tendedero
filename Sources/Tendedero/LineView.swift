@@ -18,8 +18,12 @@ enum Layout {
     }
 
     static func x(index: Int, count: Int, width: CGFloat) -> CGFloat {
-        let total = CGFloat(max(count - 1, 0)) * spacing
-        return width / 2 - total / 2 + CGFloat(index) * spacing
+        // Notes are never dropped to make room, so a narrower screen can end
+        // up with more cards than fit: they squeeze together instead of
+        // leaving the screen. The margin keeps clear of the + button.
+        let step = count > 1 ? min(spacing, max(0, width - 250) / CGFloat(count - 1)) : spacing
+        let total = CGFloat(max(count - 1, 0)) * step
+        return width / 2 - total / 2 + CGFloat(index) * step
     }
 }
 

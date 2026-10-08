@@ -85,7 +85,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NotificationCenter.default.addObserver(
             forName: NSWindow.didResignKeyNotification, object: panel, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.line.endEditing() }
+            MainActor.assumeIsolated {
+                // Our own orderOut, after editing ended, is not losing the keyboard.
+                guard let self, self.panel.allowsKey else { return }
+                self.line.endEditing()
+            }
         }
 
         // Entering or leaving full screen switches Space. Check again once the
@@ -367,6 +371,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Writing needs the keyboard, so the panel can be key only while a note
     /// is being edited, and the line stays down meanwhile.
     private func editingChanged(_ id: UUID?) {
+        // Events arrive a turn late: only the one that matches the line now counts.
+        guard line.editingID == id else { return }
         if id != nil {
             keepOpen = true
             wanted = true

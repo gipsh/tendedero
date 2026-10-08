@@ -159,11 +159,15 @@ final class Line: ObservableObject {
     /// full of notes: they never fall on their own to make room.
     @discardableResult
     func addNote(text: String = "", color: NoteColor = .random(), quietly: Bool = false) -> UUID? {
-        endEditing()
-        guard makeRoom() else { return nil }
+        // An empty note is still open: that is the one to write on.
+        if let open = editingID, isBlank(open) { return open }
+        guard makeRoom() else {
+            endEditing()
+            return nil
+        }
         let item = Pegged(text: String(text.prefix(Note.maxLength)), color: color)
         items.append(item)
-        editingID = item.id
+        switchEditing(to: item.id)
         save()
         if !quietly { play("Tink", volume: 0.35) }
         return item.id
@@ -172,8 +176,26 @@ final class Line: ObservableObject {
     func beginEditing(_ id: UUID) {
         guard editingID != id,
               items.contains(where: { $0.id == id && $0.isNote && !$0.falling }) else { return }
-        endEditing()
+        switchEditing(to: id)
+    }
+
+    /// Moves the keyboard from one note to another. The id goes straight from
+    /// one to the other, never through nil: a late "editing ended" would end
+    /// the note that was just started.
+    private func switchEditing(to id: UUID) {
+        let previous = editingID
         editingID = id
+        if let previous { commit(previous) }
+    }
+
+    private func isBlank(_ id: UUID) -> Bool {
+        guard let item = items.first(where: { $0.id == id }) else { return false }
+        return item.noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// A note left empty takes itself down.
+    private func commit(_ id: UUID) {
+        if isBlank(id) { drop(id, quietly: true) }
     }
 
     func setNoteText(_ id: UUID, _ text: String) {
@@ -186,10 +208,7 @@ final class Line: ObservableObject {
     func endEditing() {
         guard let id = editingID else { return }
         editingID = nil
-        if let item = items.first(where: { $0.id == id }),
-           item.noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            drop(id, quietly: true)
-        }
+        commit(id)
     }
 
     // MARK: Actions on one photo

@@ -63,4 +63,12 @@ final class LineStoreTests: XCTestCase {
         defaults.set(Data(json.utf8), forKey: LineStore.key)
         XCTAssertEqual(LineStore(defaults: defaults).load(), [.note(text: "hi", color: .yellow)])
     }
+
+    func testOneBadEntryDoesNotDropTheRest() {
+        let defaults = makeDefaults()
+        let json = #"[{"type":"note","text":"keep","color":"pink"},{"type":"hologram"},{"type":"photo","path":"/p.png"}]"#
+        defaults.set(Data(json.utf8), forKey: LineStore.key)
+        XCTAssertEqual(LineStore(defaults: defaults).load(),
+                       [.note(text: "keep", color: .pink), .photo(path: "/p.png")])
+    }
 }

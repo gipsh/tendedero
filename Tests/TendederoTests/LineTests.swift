@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import XCTest
 @testable import Tendedero
 
@@ -221,5 +222,33 @@ final class LineTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
 
         XCTAssertEqual(line.liveCount, 0)
+    }
+
+    // MARK: Review fixes
+
+    @MainActor
+    func testSwitchingNotesNeverPassesThroughNoEditing() throws {
+        let line = Line(defaults: makeDefaults())
+        let a = try XCTUnwrap(line.addNote(text: "a", quietly: true))
+        var seen: [UUID?] = []
+        let subscription = line.$editingID.dropFirst().sink { seen.append($0) }
+
+        let b = try XCTUnwrap(line.addNote(text: "b", quietly: true))
+        line.beginEditing(a)
+
+        XCTAssertEqual(seen, [b, a], "a stale 'editing ended' event would end the note just started")
+        subscription.cancel()
+    }
+
+    @MainActor
+    func testAskingForANewNoteWhileAnEmptyOneIsOpenReusesIt() throws {
+        let line = Line(defaults: makeDefaults())
+        let first = try XCTUnwrap(line.addNote(quietly: true))
+
+        let second = line.addNote(quietly: true)
+
+        XCTAssertEqual(second, first)
+        XCTAssertEqual(line.liveCount, 1)
+        XCTAssertEqual(line.editingID, first)
     }
 }

@@ -74,6 +74,27 @@ struct NoteTextView: NSViewRepresentable {
 final class NoteNSTextView: NSTextView {
     override var acceptsFirstResponder: Bool { true }
 
+    /// The app is an accessory with no main menu, and NSTextView only gets
+    /// its editing shortcuts from the Edit menu: handle them here.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard event.type == .keyDown, flags.contains(.command),
+              flags.subtracting([.command, .shift]).isEmpty,
+              let key = event.charactersIgnoringModifiers?.lowercased() else {
+            return super.performKeyEquivalent(with: event)
+        }
+        switch (key, flags.contains(.shift)) {
+        case ("a", false): selectAll(nil)
+        case ("c", false): copy(nil)
+        case ("x", false): cut(nil)
+        case ("v", false): paste(nil)
+        case ("z", false): undoManager?.undo()
+        case ("z", true): undoManager?.redo()
+        default: return super.performKeyEquivalent(with: event)
+        }
+        return true
+    }
+
     /// Takes the keyboard as soon as it is on screen, so you can type at once.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
