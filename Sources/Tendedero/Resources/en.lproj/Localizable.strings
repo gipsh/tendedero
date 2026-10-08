@@ -18,6 +18,7 @@
 "Quit Tendedero" = "Quit Tendedero";
 "Could not change the login setting" = "Could not change the login setting";
 "Move Tendedero to the Applications folder and try again." = "Move Tendedero to the Applications folder and try again.";
+"New note" = "New note";
 
 /* GrabArea */
 "Copy" = "Copy";
@@ -34,3 +35,7 @@
 
 /* PeggedView */
 "Copied" = "Copied";
+"Edit" = "Edit";
+
+/* NoteCard */
+"Write a task" = "Write a task";

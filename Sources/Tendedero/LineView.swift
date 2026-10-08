@@ -5,6 +5,7 @@ enum Layout {
     static let ropeTop: CGFloat = 10
     static let spacing: CGFloat = 174
     static let cardWidth: CGFloat = 150
+    static let noteSize: CGFloat = 130
     static let pinAbove: CGFloat = 9.5
 
     /// The rope hangs as a parabola from edge to edge of the screen.
@@ -17,8 +18,12 @@ enum Layout {
     }
 
     static func x(index: Int, count: Int, width: CGFloat) -> CGFloat {
-        let total = CGFloat(max(count - 1, 0)) * spacing
-        return width / 2 - total / 2 + CGFloat(index) * spacing
+        // Notes are never dropped to make room, so a narrower screen can end
+        // up with more cards than fit: they squeeze together instead of
+        // leaving the screen. The margin keeps clear of the + button.
+        let step = count > 1 ? min(spacing, max(0, width - 250) / CGFloat(count - 1)) : spacing
+        let total = CGFloat(max(count - 1, 0)) * step
+        return width / 2 - total / 2 + CGFloat(index) * step
     }
 }
 
@@ -44,6 +49,9 @@ struct LineView: View {
                         .frame(width: Layout.cardWidth, height: Layout.panelHeight - ropeY, alignment: .top)
                         .position(x: x, y: ropeY - Layout.pinAbove + (Layout.panelHeight - ropeY) / 2)
                 }
+
+                AddNoteButton(line: line)
+                    .position(x: width - 34, y: Layout.ropeY(x: width - 34, width: width) + 30)
             }
             .animation(.spring(response: 0.55, dampingFraction: 0.78), value: line.items.map(\.id))
             .animation(.easeInOut(duration: 0.3), value: line.items.isEmpty)
@@ -67,6 +75,27 @@ private struct Hint: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(.regularMaterial, in: Capsule())
+    }
+}
+
+/// The "+" at the right end of the line: hangs a new note.
+private struct AddNoteButton: View {
+    static let hitID = UUID()
+    let line: Line
+
+    var body: some View {
+        Image(systemName: "plus")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(.primary)
+            .frame(width: 28, height: 28)
+            .glassFrame(circle: true)
+            .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
+            .overlay(TapArea(onTap: { line.requestNewNote() }))
+            .background(
+                GeometryReader { g in
+                    Color.clear.preference(key: HitRectsKey.self, value: [Self.hitID: g.frame(in: .global)])
+                }
+            )
     }
 }
 

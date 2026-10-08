@@ -18,7 +18,7 @@ struct PeggedView: View {
         VStack(spacing: -12) {
             Clothespin()
                 .zIndex(1)
-            card
+            content
         }
         .rotationEffect(.degrees(swing + item.tilt), anchor: .top)
         .offset(y: arrived ? 0 : -46)
@@ -51,10 +51,10 @@ struct PeggedView: View {
     /// Distance from the top of the hanging view (the clip) to the card.
     static let cardOffsetBelowTop: CGFloat = 26 - 12
 
-    private var photoSize: CGSize { Self.photoSize(for: item.thumb.size) }
+    private var photoSize: CGSize { Self.photoSize(for: item.thumb?.size ?? .zero) }
 
-    private var card: some View {
-        Image(nsImage: item.thumb)
+    private var photoCard: some View {
+        Image(nsImage: item.thumb ?? NSImage())
             .resizable()
             .interpolation(.high)
             .frame(width: photoSize.width, height: photoSize.height)
@@ -75,15 +75,7 @@ struct PeggedView: View {
             .opacity(dragging ? 0.45 : 1)
             .overlay(alignment: .topLeading) {
                 // Drawn here, clicked through GrabView, which sits on top.
-                Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 20, height: 20)
-                    .glassFrame(circle: true)
-                    .padding(3)
-                    .opacity(hovering && !dragging ? 1 : 0)
-                    .scaleEffect(hovering ? 1 : 0.6)
-                    .allowsHitTesting(false)
+                crossBadge(visible: hovering && !dragging)
             }
             .overlay(GrabArea(item: item, line: line))
             .overlay(alignment: .bottom) {
@@ -105,6 +97,60 @@ struct PeggedView: View {
                 GeometryReader { g in
                     Color.clear.preference(key: HitRectsKey.self,
                                            value: item.falling ? [:] : [item.id: g.frame(in: .global)])
+                }
+            )
+    }
+
+    private var editing: Bool { line.editingID == item.id }
+
+    @ViewBuilder
+    private var content: some View {
+        if item.isNote { noteCard } else { photoCard }
+    }
+
+    private func crossBadge(visible: Bool) -> some View {
+        Image(systemName: "xmark")
+            .font(.system(size: 8, weight: .bold))
+            .foregroundStyle(.primary)
+            .frame(width: 20, height: 20)
+            .glassFrame(circle: true)
+            .padding(3)
+            .opacity(visible ? 1 : 0)
+            .scaleEffect(hovering ? 1 : 0.6)
+            .allowsHitTesting(false)
+    }
+
+    /// A sticky note: same clothespin, swing and fall as a photo. Click to
+    /// write on it; the cross and "Take down" both remove it.
+    private var noteCard: some View {
+        let id = item.id
+        let line = line
+        return NoteCard(text: item.noteText, color: item.noteColor, editing: editing,
+                        onText: { line.setNoteText(id, $0) }, onCommit: { line.endEditing() })
+            .shadow(color: .black.opacity(hovering ? 0.26 : 0.18), radius: hovering ? 14 : 10, y: hovering ? 8 : 5)
+            .scaleEffect(hovering && !editing ? 1.035 : 1, anchor: .top)
+            .overlay(alignment: .topLeading) {
+                crossBadge(visible: hovering && !editing)
+            }
+            .overlay {
+                if !editing {
+                    TapArea(onTap: { line.beginEditing(id) },
+                            onCross: { line.discard(id) },
+                            menuProvider: {
+                                let menu = NSMenu()
+                                menu.addItem(ClosureMenuItem(L("Edit")) { line.beginEditing(id) })
+                                menu.addItem(.separator())
+                                menu.addItem(ClosureMenuItem(L("Take down")) { line.discard(id) })
+                                return menu
+                            })
+                }
+            }
+            .animation(.easeOut(duration: 0.18), value: hovering)
+            .onHover { hovering = $0 }
+            .background(
+                GeometryReader { g in
+                    Color.clear.preference(key: HitRectsKey.self,
+                                           value: item.falling ? [:] : [id: g.frame(in: .global)])
                 }
             )
     }

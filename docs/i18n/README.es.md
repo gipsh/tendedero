@@ -51,7 +51,17 @@ Lleva el puntero a la barra de menús y la cuerda baja. Apártalo y desaparece.
 | Dejar el puntero en la barra de menús | Baja la cuerda en esa pantalla. |
 | Hacer clic en cualquier sitio de la barra de menús | Recoge la cuerda. |
 | <kbd>⌃</kbd>&thinsp;<kbd>⌥</kbd>&thinsp;<kbd>T</kbd> | Muestra u oculta la cuerda. |
+| <kbd>⌃</kbd>&thinsp;<kbd>⌥</kbd>&thinsp;<kbd>N</kbd> | Cuelga una nota nueva. |
 
+<br>
+
+## También notas.
+
+Cuelga una nota junto a tus capturas con lo que te falta hacer.
+Pulsa <kbd>⌃</kbd>&thinsp;<kbd>⌥</kbd>&thinsp;<kbd>N</kbd> o el + de la cuerda, escríbela y pulsa Intro.
+Cuando esté hecha, descuélgala con la cruz.
+
+<br>
 <br>
 
 ## Tu Escritorio, por fin despejado.

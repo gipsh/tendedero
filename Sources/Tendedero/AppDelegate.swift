@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var safetyWatcher: ScreenshotWatcher?
     private var signalSources: [DispatchSourceSignal] = []
     private var hotKey: HotKey?
+    private var noteHotKey: HotKey?
     private var cancellables = Set<AnyCancellable>()
     private var mouseTimer: Timer?
 
@@ -58,17 +59,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hotKey = HotKey(keyCode: kVK_ANSI_T, modifiers: controlKey | optionKey) { [weak self] in
             self?.toggle()
         }
+        noteHotKey = HotKey(keyCode: kVK_ANSI_N, modifiers: controlKey | optionKey) { [weak self] in
+            self?.newNote()
+        }
 
         setUpStatusItem()
         watchMenuBarClicks()
+        watchEditingClicks()
 
         Markup.shared.onSaved = { [weak self] url in self?.line.reloadThumbnail(for: url) }
         line.onFall = { [weak self] item in self?.fall(item) }
+        line.onNewNote = { [weak self] in self?.newNote() }
 
         line.$items
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.itemsChanged() }
             .store(in: &cancellables)
+
+        line.$editingID
+            .receive(on: RunLoop.main)
+            .sink { [weak self] id in self?.editingChanged(id) }
+            .store(in: &cancellables)
+
+        // Losing the keyboard to another app ends the note.
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification, object: panel, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                // Our own orderOut, after editing ended, is not losing the keyboard.
+                guard let self, self.panel.allowsKey else { return }
+                self.line.endEditing()
+            }
+        }
 
         // Entering or leaving full screen switches Space. Check again once the
         // switch animation has settled.
@@ -213,12 +235,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func fly(_ id: UUID, from: CGRect) {
         guard isPresent, isRevealed, let screen = panel.screen,
               let to = cardFrame(for: id),
-              let item = line.items.first(where: { $0.id == id }) else {
+              let item = line.items.first(where: { $0.id == id }),
+              let url = item.url else {
             line.land(id)
             return
         }
         let pixels = Int(max(from.width, from.height) * screen.backingScaleFactor)
-        guard let image = makeThumbnail(item.url, maxPixels: min(3000, max(400, pixels)))?
+        guard let image = makeThumbnail(url, maxPixels: min(3000, max(400, pixels)))?
             .cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             line.land(id)
             return
@@ -232,8 +255,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func fall(_ item: Pegged) {
         guard isPresent, isRevealed, !item.flying, let screen = panel.screen,
               let card = cardFrame(for: item.id),
-              let image = item.thumb.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+              let image = fallImage(for: item, scale: screen.backingScaleFactor) else { return }
         CaptureFlight.fall(image: image, card: card, tilt: CGFloat(item.tilt), on: screen)
+    }
+
+    /// What falls: the photo, or the paper drawn once as an image.
+    private func fallImage(for item: Pegged, scale: CGFloat) -> CGImage? {
+        if let thumb = item.thumb {
+            return thumb.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        }
+        let renderer = ImageRenderer(content: NoteCard(text: item.noteText, color: item.noteColor))
+        renderer.scale = scale
+        return renderer.cgImage
     }
 
     /// Where a card will hang, in screen coordinates, using the same layout
@@ -244,7 +277,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let x = Layout.x(index: index, count: line.items.count, width: width)
         let viewTop = Layout.ropeY(x: x, width: width) - Layout.pinAbove
         let cardTop = viewTop + PeggedView.cardOffsetBelowTop
-        let size = PeggedView.cardSize(for: line.items[index].thumb.size)
+        let item = line.items[index]
+        let size = item.isNote
+            ? CGSize(width: Layout.noteSize, height: Layout.noteSize)
+            : PeggedView.cardSize(for: item.thumb?.size ?? .zero)
         return CGRect(x: panel.frame.minX + x - size.width / 2,
                       y: panel.frame.maxY - cardTop - size.height,
                       width: size.width, height: size.height)
@@ -295,6 +331,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         isRevealed = on
         line.revealed = on
         if !on {
+            line.endEditing()
             pinned = false
             peekUntil = .distantPast
             panel.ignoresMouseEvents = true
@@ -316,6 +353,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             updateCapacity()
             refresh()
             reveal(pinned: true)
+        }
+    }
+
+    // MARK: Notes
+
+    /// A new note, written in place. Nothing happens when a full screen app
+    /// hides the line or the line is full of notes.
+    private func newNote() {
+        if let screen = LinePanel.screenUnderPointer(), FullScreen.isActive(on: screen) {
+            NSSound.beep()
+            return
+        }
+        if line.addNote() == nil { NSSound.beep() }
+    }
+
+    /// Writing needs the keyboard, so the panel can be key only while a note
+    /// is being edited, and the line stays down meanwhile.
+    private func editingChanged(_ id: UUID?) {
+        // Events arrive a turn late: only the one that matches the line now counts.
+        guard line.editingID == id else { return }
+        if id != nil {
+            keepOpen = true
+            wanted = true
+            if !isRevealed {
+                panel.placeOnScreen()
+                updateCapacity()
+            }
+            refresh()
+            reveal(pinned: true)
+            panel.allowsKey = true
+            panel.makeKeyAndOrderFront(nil)
+        } else if panel.allowsKey {
+            panel.allowsKey = false
+            panel.makeFirstResponder(nil)
+            // Ordering the panel out hands the keyboard back to the app you
+            // were in; ordering it front again keeps the line on screen.
+            panel.orderOut(nil)
+            if isPresent { panel.orderFrontRegardless() }
+            keepOpen = false
+            itemsChanged()
+        }
+    }
+
+    /// A click anywhere outside the note being written commits it.
+    private func watchEditingClicks() {
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.line.endEditing() }
+        }) {
+            clickMonitors.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] event in
+            MainActor.assumeIsolated {
+                guard let self, let id = self.line.editingID else { return }
+                let p = self.panel.convertPoint(fromScreen: NSEvent.mouseLocation)
+                let flipped = CGPoint(x: p.x, y: self.panel.frame.height - p.y)
+                if !(self.line.hitRects[id]?.contains(flipped) ?? false) { self.line.endEditing() }
+            }
+            return event
+        }) {
+            clickMonitors.append(local)
         }
     }
 
@@ -412,7 +509,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let inside = NSMouseInRect(mouse, zone, false)
         if inside && pinned { pinned = false }
 
-        let busy = pinned || GrabView.isDragging || line.pressedID != nil || now < peekUntil
+        let busy = pinned || GrabView.isDragging || line.pressedID != nil || line.editingID != nil || now < peekUntil
         if inside || busy {
             awaySince = nil
         } else {
@@ -464,6 +561,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         toggleItem.keyEquivalent = "t"
         toggleItem.keyEquivalentModifierMask = [.control, .option]
         menu.addItem(toggleItem)
+
+        let noteItem = ClosureMenuItem(L("New note")) { [weak self] in
+            self?.newNote()
+        }
+        noteItem.keyEquivalent = "n"
+        noteItem.keyEquivalentModifierMask = [.control, .option]
+        menu.addItem(noteItem)
 
         let clearItem = ClosureMenuItem(L("Take everything down")) { [weak self] in
             self?.line.clear()

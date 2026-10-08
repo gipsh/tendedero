@@ -49,7 +49,17 @@ Rest the pointer in the menu bar and it glides down. Move away and it's gone.
 | Rest the pointer in the menu bar | Bring the line down on that screen. |
 | Click anything in the menu bar | Put it away. |
 | <kbd>⌃</kbd>&thinsp;<kbd>⌥</kbd>&thinsp;<kbd>T</kbd> | Show or hide the line. |
+| <kbd>⌃</kbd>&thinsp;<kbd>⌥</kbd>&thinsp;<kbd>N</kbd> | Hang a new note. |
 
+<br>
+
+## Notes, too.
+
+Hang a sticky note next to your screenshots for what you still have to do.
+Press <kbd>⌃</kbd>&thinsp;<kbd>⌥</kbd>&thinsp;<kbd>N</kbd> or the + on the line, write it, press Return.
+When it's done, take it down with the cross.
+
+<br>
 <br>
 
 ## Your Desktop. Finally clear.
