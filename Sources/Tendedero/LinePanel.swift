@@ -21,7 +21,11 @@ final class LinePanel: NSPanel {
         contentView = content
     }
 
-    override var canBecomeKey: Bool { false }
+    /// The line never takes focus, except while a note is being written:
+    /// then it must be key to receive the keyboard.
+    var allowsKey = false
+
+    override var canBecomeKey: Bool { allowsKey }
     override var canBecomeMain: Bool { false }
 
     /// The line hangs on the screen you are using, which is the one with the

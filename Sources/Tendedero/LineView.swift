@@ -5,6 +5,7 @@ enum Layout {
     static let ropeTop: CGFloat = 10
     static let spacing: CGFloat = 174
     static let cardWidth: CGFloat = 150
+    static let noteSize: CGFloat = 130
     static let pinAbove: CGFloat = 9.5
 
     /// The rope hangs as a parabola from edge to edge of the screen.
