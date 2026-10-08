@@ -69,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         Markup.shared.onSaved = { [weak self] url in self?.line.reloadThumbnail(for: url) }
         line.onFall = { [weak self] item in self?.fall(item) }
+        line.onNewNote = { [weak self] in self?.newNote() }
 
         line.$items
             .receive(on: RunLoop.main)
@@ -250,8 +251,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func fall(_ item: Pegged) {
         guard isPresent, isRevealed, !item.flying, let screen = panel.screen,
               let card = cardFrame(for: item.id),
-              let image = item.thumb?.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+              let image = fallImage(for: item, scale: screen.backingScaleFactor) else { return }
         CaptureFlight.fall(image: image, card: card, tilt: CGFloat(item.tilt), on: screen)
+    }
+
+    /// What falls: the photo, or the paper drawn once as an image.
+    private func fallImage(for item: Pegged, scale: CGFloat) -> CGImage? {
+        if let thumb = item.thumb {
+            return thumb.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        }
+        let renderer = ImageRenderer(content: NoteCard(text: item.noteText, color: item.noteColor))
+        renderer.scale = scale
+        return renderer.cgImage
     }
 
     /// Where a card will hang, in screen coordinates, using the same layout
@@ -262,7 +273,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let x = Layout.x(index: index, count: line.items.count, width: width)
         let viewTop = Layout.ropeY(x: x, width: width) - Layout.pinAbove
         let cardTop = viewTop + PeggedView.cardOffsetBelowTop
-        let size = PeggedView.cardSize(for: line.items[index].thumb?.size ?? .zero)
+        let item = line.items[index]
+        let size = item.isNote
+            ? CGSize(width: Layout.noteSize, height: Layout.noteSize)
+            : PeggedView.cardSize(for: item.thumb?.size ?? .zero)
         return CGRect(x: panel.frame.minX + x - size.width / 2,
                       y: panel.frame.maxY - cardTop - size.height,
                       width: size.width, height: size.height)
@@ -541,6 +555,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         toggleItem.keyEquivalent = "t"
         toggleItem.keyEquivalentModifierMask = [.control, .option]
         menu.addItem(toggleItem)
+
+        let noteItem = ClosureMenuItem(L("New note")) { [weak self] in
+            self?.newNote()
+        }
+        noteItem.keyEquivalent = "n"
+        noteItem.keyEquivalentModifierMask = [.control, .option]
+        menu.addItem(noteItem)
 
         let clearItem = ClosureMenuItem(L("Take everything down")) { [weak self] in
             self?.line.clear()
