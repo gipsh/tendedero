@@ -56,6 +56,8 @@ final class Line: ObservableObject {
     @Published var pressedID: UUID?
     /// Whether the line has slid down into view.
     @Published var revealed = false
+    /// The note being written, if any. Only one at a time.
+    @Published private(set) var editingID: UUID?
 
     /// Card frames in window coordinates, reported by the views. The panel
     /// uses them to only catch clicks over photos and let the rest through.
@@ -118,6 +120,7 @@ final class Line: ObservableObject {
 
     func drop(_ id: UUID, quietly: Bool = false) {
         guard let i = items.firstIndex(where: { $0.id == id }), !items[i].falling else { return }
+        if editingID == id { editingID = nil }
         onFall?(items[i])
         items[i].falling = true
         hitRects[id] = nil
@@ -142,6 +145,50 @@ final class Line: ObservableObject {
         for item in items where !item.falling {
             guard let url = item.url, !FileManager.default.fileExists(atPath: url.path) else { continue }
             drop(item.id, quietly: true)
+        }
+    }
+
+    // MARK: Notes
+
+    /// Called when someone asks for a new note from the line itself.
+    var onNewNote: (() -> Void)?
+
+    func requestNewNote() { onNewNote?() }
+
+    /// Hangs an empty note and leaves it ready to write. Nil when the line is
+    /// full of notes: they never fall on their own to make room.
+    @discardableResult
+    func addNote(text: String = "", color: NoteColor = .random(), quietly: Bool = false) -> UUID? {
+        endEditing()
+        guard makeRoom() else { return nil }
+        let item = Pegged(text: String(text.prefix(Note.maxLength)), color: color)
+        items.append(item)
+        editingID = item.id
+        save()
+        if !quietly { play("Tink", volume: 0.35) }
+        return item.id
+    }
+
+    func beginEditing(_ id: UUID) {
+        guard editingID != id,
+              items.contains(where: { $0.id == id && $0.isNote && !$0.falling }) else { return }
+        endEditing()
+        editingID = id
+    }
+
+    func setNoteText(_ id: UUID, _ text: String) {
+        guard let i = items.firstIndex(where: { $0.id == id && $0.isNote && !$0.falling }) else { return }
+        items[i].kind = .note(text: String(text.prefix(Note.maxLength)), color: items[i].noteColor)
+        save()
+    }
+
+    /// Commits the note being written. One left empty takes itself down.
+    func endEditing() {
+        guard let id = editingID else { return }
+        editingID = nil
+        if let item = items.first(where: { $0.id == id }),
+           item.noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            drop(id, quietly: true)
         }
     }
 
