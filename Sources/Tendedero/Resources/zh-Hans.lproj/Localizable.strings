@@ -16,6 +16,7 @@
 "Quit Tendedero" = "退出 Tendedero";
 "Could not change the login setting" = "无法更改登录项设置";
 "Move Tendedero to the Applications folder and try again." = "请先把 Tendedero 移到「应用程序」文件夹，再试一次。";
+"New note" = "新建便签";
 
 /* GrabArea */
 "Copy" = "复制";
@@ -32,3 +33,7 @@
 
 /* PeggedView */
 "Copied" = "已复制";
+"Edit" = "编辑";
+
+/* NoteCard */
+"Write a task" = "写下一项任务";

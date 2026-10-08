@@ -16,6 +16,7 @@
 "Quit Tendedero" = "Salir de Tendedero";
 "Could not change the login setting" = "No se pudo cambiar el inicio de sesión";
 "Move Tendedero to the Applications folder and try again." = "Mueve Tendedero a la carpeta Aplicaciones y vuelve a intentarlo.";
+"New note" = "Nueva nota";
 
 /* GrabArea */
 "Copy" = "Copiar";
@@ -32,3 +33,7 @@
 
 /* PeggedView */
 "Copied" = "Copiado";
+"Edit" = "Editar";
+
+/* NoteCard */
+"Write a task" = "Escribe una tarea";

@@ -51,7 +51,17 @@
 | 指针停在菜单栏 | 在那一块屏幕上放下绳子。 |
 | 点击菜单栏任意处 | 把绳子收起来。 |
 | <kbd>⌃</kbd>&thinsp;<kbd>⌥</kbd>&thinsp;<kbd>T</kbd> | 显示或隐藏绳子。 |
+| <kbd>⌃</kbd>&thinsp;<kbd>⌥</kbd>&thinsp;<kbd>N</kbd> | 挂上一张新便签。 |
 
+<br>
+
+## 也可以挂便签
+
+在截图旁边挂一张便签，写下还没做完的事。
+按 <kbd>⌃</kbd>&thinsp;<kbd>⌥</kbd>&thinsp;<kbd>N</kbd> 或点击绳子上的 +，写好后按回车。
+做完了，点一下角上的叉把它摘下来。
+
+<br>
 <br>
 
 ## 桌面，终于清爽了
